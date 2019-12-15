@@ -1,8 +1,10 @@
 package com.hupu.flink.base
 
 
+import org.apache.flink.api.common.functions.FlatMapFunction
 import org.apache.flink.api.scala.ExecutionEnvironment
 import org.apache.flink.streaming.api.scala._
+import org.apache.flink.util.Collector
 
 object Demo01 {
 
@@ -11,10 +13,21 @@ object Demo01 {
 
 
     val environment = ExecutionEnvironment.getExecutionEnvironment
-    val ds = environment.readTextFile("/Users/gaohui/Documents/flinkForwardAsia/flinkDemo01/f1")
+    val ds = environment.readTextFile("E:\\韩顺平 - Scala\\myNotes\\flinkLearning\\f1")
 
-    ds.flatMap(_.split(" ")).map((_, 1)).groupBy(0).sum(1).print()
 
+    val ds2 = ds.flatMap(new FlatMapFunction[String, String] {
+      override def flatMap(t: String, collector: Collector[String]): Unit = {
+        t.split(",").foreach(collector.collect)
+      }
+    })
+
+    ds2.print()
+
+
+
+    //    ds.flatMap(_.split(" ")).map((_, 1))
+    //      .groupBy(0).sum(1).print()
 
 
     //    val environment = StreamExecutionEnvironment.getExecutionEnvironment

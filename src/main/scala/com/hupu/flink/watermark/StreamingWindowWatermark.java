@@ -15,10 +15,17 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
 
-import javax.annotation.Nullable;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 
+import javax.annotation.Nullable;
+
+/**
+ *
+ */
 public class StreamingWindowWatermark {
 
     public static void main(String[] args) throws Exception {
@@ -26,7 +33,7 @@ public class StreamingWindowWatermark {
         int port = 9010;
         //获取运行环境
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        //设置使用eventtime，默认是使用processtime
+        //设置使用eventtime，默认是使用 processtime
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
         //设置并行度为1,默认并行度是当前机器的cpu数量
         env.setParallelism(1);
