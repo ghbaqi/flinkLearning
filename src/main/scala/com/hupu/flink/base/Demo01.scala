@@ -13,21 +13,24 @@ object Demo01 {
 
 
     val environment = ExecutionEnvironment.getExecutionEnvironment
-    val ds = environment.readTextFile("E:\\韩顺平 - Scala\\myNotes\\flinkLearning\\f1")
+    val ds = environment.readTextFile("/Users/gaohui/flinkLearning/flinkLearning/f1")
 
 
-    val ds2 = ds.flatMap(new FlatMapFunction[String, String] {
-      override def flatMap(t: String, collector: Collector[String]): Unit = {
-        t.split(",").foreach(collector.collect)
-      }
-    })
+    //    val ds2 = ds.flatMap(new FlatMapFunction[String, String] {
+    //      override def flatMap(t: String, collector: Collector[String]): Unit = {
+    //        t.split(",").foreach(collector.collect)
+    //      }
+    //    })
+    //
+    //    ds2.print()
 
-    ds2.print()
 
-
-
-    //    ds.flatMap(_.split(" ")).map((_, 1))
-    //      .groupBy(0).sum(1).print()
+    ds
+      .flatMap(_.split(" "))
+      .map((_, 1))
+      .groupBy(0)
+      .sum(1)
+      .print()
 
 
     //    val environment = StreamExecutionEnvironment.getExecutionEnvironment
