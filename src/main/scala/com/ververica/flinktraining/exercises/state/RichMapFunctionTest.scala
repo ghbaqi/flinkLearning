@@ -10,7 +10,7 @@ import org.apache.flink.streaming.api.scala._
 
 /**
  * 无状态 : 流式输入的数据 , 后面数据的计算结果不依赖于前面的数据                        eg : map  flatMap keyBy
- * 有状态 : 流式输入的数据 , 后面数据的计算结果依赖于前面的数据 , 随着数据累计结果不停变化  eg : count  max  average
+ * 有状态 : 流式输入的数据 , 后面数据的计算结果依赖于前面历史数据的累计运算结果 , 随着数据累计结果不停变化  eg : count  max  average 等
  */
 
 /**
@@ -27,25 +27,25 @@ object RichMapFunctionTest {
 
   def main(args: Array[String]): Unit = {
 
-    val env = StreamExecutionEnvironment.getExecutionEnvironment
-
     /**
      * 需求 : 对传感器温度做 map 操作
      *
-     * 假设温度 > 100 认为传感器已经损坏 , 后续进来的都  map 标记为为异常传感器
+     * 假设温度 > 100 认为传感器已经损坏 , 后续进来的数据都  map 标记为为异常传感器
      * 否则认为是正常传感器
      */
 
     val list = List(
-      SensorReading(1, 13.5), // 1,13.5,正常)
-      SensorReading(2, 110), // (2,110.0,异常)
-      SensorReading(1, 105), // (1,105.0,异常)
-      SensorReading(3, 15.5), // (3,15.5,正常)
-      SensorReading(2, 16.5), // (2,16.5,异常)
+      SensorReading(1, 13.5), // (1,13.5,正常)
+      SensorReading(1, 105), //  (1,105.0,异常)
       SensorReading(1, 13.5), // (1,13.5,异常)
-      SensorReading(3, 13.5) //  (3,13.5,正常)
+      SensorReading(2, 110), //  (2,110.0,异常)
+      SensorReading(2, 16.5), // (2,16.5,异常)
+      SensorReading(3, 15.5), // (3,15.5,正常)
+      SensorReading(3, 90.5) //  (3,13.5,正常)
     )
 
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.setParallelism(1)
     val ds: KeyedStream[SensorReading, Int] = env
       .fromCollection(list)
       // 相当于  mysql 里面的 group by  ,  会导致数据重分区  , 这里我们按照传感器 id 分组
@@ -70,13 +70,6 @@ class MyRichMapFunction01 extends RichMapFunction[SensorReading, (Int, Double, S
 
   override def open(parameters: Configuration): Unit = {
     state = getRuntimeContext.getState(new ValueStateDescriptor[Boolean]("sensorState", classOf[Boolean]))
-
-    /**
-     * 血泪踩坑 , 不能在 open 方法里更新状态
-     *
-     * Keyed state can only be used on a 'keyed stream', i.e., after a 'keyBy()' operation.
-     */
-    //    state.update(true)
   }
 
   override def map(sensor: SensorReading): (Int, Double, String) = {

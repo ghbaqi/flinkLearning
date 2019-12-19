@@ -28,14 +28,14 @@ import org.apache.flink.util.Collector
  * 引入 waterMark 的概念是为了更好的利用 eventTime 进行窗口计算。
  * 因为事件到达它所属于的窗口是乱序的 , 没有保障的 。可能时间已经来到窗口的  endTime 此时还有事件尚未到达。这时候也不能无限的等待下去
  * 必须有一个机制去触发窗口计算 。
- * 当 waterMark  > 一个窗口的 endTime 时 , 此时就会触发这个窗口进行计算
+ * 当 waterMark  >  一个窗口的 endTime 时 , 此时就会触发这个窗口进行计算
  *
  * 如何生成 waterMark ?
  * 通常是 eventTime - 等待时间 , 且随着时间单调递增
  *
  * 很明显 :
- * 等待时间越长 , 可能丢失的数据越少 , 但延迟越高
- * 等待时间越短 , 可能丢失的数据越多 , 但延迟越低  ; (此时就是一个 tradeOff)
+ * 等待时间越大 , 可能丢失的数据越少 , 但延迟越高
+ * 等待时间越小 , 可能丢失的数据越多 , 但延迟越低  ; (此时就是一个 tradeOff)
  *
  */
 
@@ -107,17 +107,11 @@ object WatermarkTest {
 
 class MyAssignerWithPeriodicWatermarks extends AssignerWithPeriodicWatermarks[SensorReading] {
 
-  val waitTime = 5000 // 延迟时间 , 最多等待 5 秒 中
+  val waitTime = 5000 // 延迟时间 , 最多等待 5 秒 中 。比窗口结束时间大 5s 的数据都到了 , 不再等待 触发计算
 
   var currentMaxTimeMills = 0L
 
-  // 生成 waterMark
-  override def getCurrentWatermark: Watermark = {
-    val watermark = new Watermark(currentMaxTimeMills - waitTime)
-    watermark
-  }
-
-  // 生成 eventTime
+  // 生成 eventTime  (1 , 12.5 , 2018-11-11 12:12:20)
   override def extractTimestamp(sensor: SensorReading, previousElementTimestamp: Long): Long = {
 
     val dataFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
@@ -127,14 +121,22 @@ class MyAssignerWithPeriodicWatermarks extends AssignerWithPeriodicWatermarks[Se
     timeMills
 
   }
+
+  // 生成 waterMark
+  override def getCurrentWatermark: Watermark = {
+    val watermark = new Watermark(currentMaxTimeMills - waitTime)
+    watermark
+  }
+
+
 }
 
 /**
  * 输入数据						                         所属窗口                waterMark
- * 1, 11.2 , 2019-12-18 15:00:05               [00 - 10)				        00
- * 2, 11.2 , 2019-12-18 15:00:01			         [00 - 10)				        00
- * 1, 11.2 , 2019-12-18 15:00:10			         [10 - 20)                05
- * 2, 11.2 , 2019-12-18 15:00:16			         [10 - 20)                11  此时 11 > 窗口结束时间 10 , 会触发 [00 - 10) 的窗口进行运算
+ * 1 , 11.2 , 2019-12-18 15:00:05               [00 - 10)				        00
+ * 2 , 11.2 , 2019-12-18 15:00:01			         [00 - 10)				        00
+ * 1 , 11.2 , 2019-12-18 15:00:11			         [10 - 20)                06
+ * 2 , 11.2 , 2019-12-18 15:00:16			         [10 - 20)                11  此时 11 > 窗口结束时间 10 , 会触发 [00 - 10) 的窗口进行运算
  *
  */
 
