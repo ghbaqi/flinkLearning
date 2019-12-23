@@ -31,42 +31,44 @@ import org.apache.flink.util.Collector
  * 当 waterMark  >  一个窗口的 endTime 时 , 此时就会触发这个窗口进行计算
  *
  * 如何生成 waterMark ?
- * 通常是 eventTime - 等待时间 , 且随着时间单调递增
+ * 通常是 eventTime - 等待时间 , 且随着时间单调递增 ↑
  *
  * 很明显 :
  * 等待时间越大 , 可能丢失的数据越少 , 但延迟越高
- * 等待时间越小 , 可能丢失的数据越多 , 但延迟越低  ; (此时就是一个 tradeOff)
+ * 等待时间越小 , 可能丢失的数据越多 , 但延迟越低  ; (这其实是一个 tradeOff)
  *
  */
 
-// (1 , 12.4 , 2019-12-18 15:00:02)
+// 传感器  样例类(1 , 12.4 , 2019-12-18 15:00:02)
 case class SensorReading(id: Int, temperature: Double, time: String)
 
 object WatermarkTest {
 
   def main(args: Array[String]): Unit = {
 
+    // 1. 创建执行环境
     val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
 
-    /**
-     * 指定 flink 按照什么时间来处理 , 默认为 TimeCharacteristic.ProcessingTime
-     */
+    // 2 . 指定 flink 按照什么时间来处理 , 默认为 TimeCharacteristic.ProcessingTime
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.setParallelism(1)
 
 
+    // 3 4 设定数据源 , 进行 transformations
     val sensorDs: DataStream[SensorReading] = env.socketTextStream("127.0.0.1", 7777)
       .filter(s => StringUtils.isNotBlank(s) && s.split(",").length == 3)
       .map(s => {
+
+        // 把输入的字符串按 , 分隔 转化成 SensorReading
         val arr = s.split(",")
-        SensorReading(arr(0).toInt, arr(1).toDouble, arr(2))
+        SensorReading(arr(0).trim.toInt, arr(1).trim.toDouble, arr(2).trim)
       })
 
-    // 指定 eventTime 和 waterMark 生成方式
+    // 5 . 指定 eventTime 和 waterMark 生成方式
     val waterMarkStream: DataStream[SensorReading] = sensorDs.assignTimestampsAndWatermarks(new MyAssignerWithPeriodicWatermarks)
 
 
-    // 每十秒的数据作为一个窗口
+    // 6 . 每十秒的数据作为一个窗口
     val windowStream: WindowedStream[SensorReading, Int, TimeWindow] = waterMarkStream.keyBy(_.id)
 
       /**
@@ -82,19 +84,29 @@ object WatermarkTest {
       .timeWindow(Time.seconds(10))
 
 
+    // 7 . 窗口计算
     val result: DataStream[String] = windowStream.apply(new WindowFunction[SensorReading, String, Int, TimeWindow] {
 
+
+      /**
+       *
+       * @param key       sensor.id
+       * @param window    当前窗口对象
+       * @param list      当前窗口内的所有数据
+       * @param collector [String] 收集结果 , 结果泛型为 String
+       */
       override def apply(key: Int, window: TimeWindow, list: Iterable[SensorReading], collector: Collector[String]): Unit = {
 
         val res = list.toString()
+        collector.collect(res)
 
         val dataFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
         println(s"触发窗口计算 id = $key , windowEndTime = ${dataFormat.format(new Date(window.getEnd))} , 窗口内数据 = ${res}")
 
-        collector.collect(res)
       }
     })
 
+    // 8 打印结果到控制台
     result.print()
 
 
@@ -105,6 +117,9 @@ object WatermarkTest {
 }
 
 
+/**
+ * 指定 eventTime 和 生成 waterMark 的方式
+ */
 class MyAssignerWithPeriodicWatermarks extends AssignerWithPeriodicWatermarks[SensorReading] {
 
   val waitTime = 5000 // 延迟时间 , 最多等待 5 秒 中 。比窗口结束时间大 5s 的数据都到了 , 不再等待 触发计算
@@ -133,10 +148,10 @@ class MyAssignerWithPeriodicWatermarks extends AssignerWithPeriodicWatermarks[Se
 
 /**
  * 输入数据						                         所属窗口                waterMark
- * 1 , 11.2 , 2019-12-18 15:00:05               [00 - 10)				        00
- * 2 , 11.2 , 2019-12-18 15:00:01			         [00 - 10)				        00
+ * 1 , 11.2 , 2019-12-18 15:00:05              [00 - 10)				        00
+ * 1 , 11.2 , 2019-12-18 15:00:01			         [00 - 10)				        00
  * 1 , 11.2 , 2019-12-18 15:00:11			         [10 - 20)                06
- * 2 , 11.2 , 2019-12-18 15:00:16			         [10 - 20)                11  此时 11 > 窗口结束时间 10 , 会触发 [00 - 10) 的窗口进行运算
+ * 1 , 11.2 , 2019-12-18 15:00:16			         [10 - 20)                11      此时 11 > 窗口结束时间 10 , 会触发 [00 - 10) 的窗口进行运算
  *
  */
 
@@ -144,9 +159,7 @@ class MyAssignerWithPeriodicWatermarks extends AssignerWithPeriodicWatermarks[Se
 
 
 
-
-
-
+// 2 , 11.2 , 2019-12-18 15:00:27              [20 - 30)                22
 
 
 

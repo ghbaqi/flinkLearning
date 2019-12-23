@@ -20,7 +20,7 @@ import org.apache.flink.streaming.api.scala._
  *
  */
 
-
+// 样例类 一个传感器对象 , 两个属性  id 和 temperature
 case class SensorReading(id: Int, temperature: Double)
 
 object RichMapFunctionTest {
@@ -38,14 +38,18 @@ object RichMapFunctionTest {
       SensorReading(1, 13.5), // (1,13.5,正常)
       SensorReading(1, 105), //  (1,105.0,异常)
       SensorReading(1, 13.5), // (1,13.5,异常)
+
       SensorReading(2, 110), //  (2,110.0,异常)
       SensorReading(2, 16.5), // (2,16.5,异常)
+
       SensorReading(3, 15.5), // (3,15.5,正常)
       SensorReading(3, 90.5) //  (3,13.5,正常)
     )
 
+    // 1. 创建执行环境
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     env.setParallelism(1)
+
     val ds: KeyedStream[SensorReading, Int] = env
       .fromCollection(list)
       // 相当于  mysql 里面的 group by  ,  会导致数据重分区  , 这里我们按照传感器 id 分组
@@ -61,13 +65,16 @@ object RichMapFunctionTest {
 
 }
 
-
+/**
+ * 自定义有状态的  map 函数
+ */
 class MyRichMapFunction01 extends RichMapFunction[SensorReading, (Int, Double, String)] {
 
   // 保存传感器状态 true 正常 , false 异常了
   var state: ValueState[Boolean] = _
 
 
+  // 创建一个 ValueState[Boolean]
   override def open(parameters: Configuration): Unit = {
     state = getRuntimeContext.getState(new ValueStateDescriptor[Boolean]("sensorState", classOf[Boolean]))
   }

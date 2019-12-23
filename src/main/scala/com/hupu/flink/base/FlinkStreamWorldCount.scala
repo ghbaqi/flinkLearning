@@ -11,7 +11,7 @@ object FlinkStreamWorldCount {
 
   def main(args: Array[String]): Unit = {
 
-    // 创建一个执行环境
+    // 1. 创建一个执行环境
     val environment = StreamExecutionEnvironment.getExecutionEnvironment
     environment.setParallelism(1)
 
@@ -20,10 +20,14 @@ object FlinkStreamWorldCount {
      *  env.fromCollection(List)
      *  env.socketTextStream(host, port)
      *  env.readTextFile("file:///path")
+     * 自定义数据源
      * kafaka  kinesis 等
      */
-    val ds = environment.socketTextStream("127.0.0.1", 7777)
 
+    // 2. source
+    val ds: DataStream[String] = environment.socketTextStream("127.0.0.1", 7777)
+
+    // 3. 各种 transformations
     // flatMap 空格分隔
     ds.flatMap((s: String) => s.split(" "))
       // 过滤掉空串
@@ -32,7 +36,7 @@ object FlinkStreamWorldCount {
       // keyBy 相当于 mysql 里面的 group by , 会引起数据的重分区。这里按照 单词 来分组
       .keyBy(0)
       .sum(1)
-      // 将结果打印到控制台
+      // 4. 将结果打印到控制台
       .print()
 
     // 执行
